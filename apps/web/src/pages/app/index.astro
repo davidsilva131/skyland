@@ -1,0 +1,13 @@
+---
+import Layout from '../../layouts/Base.astro';
+import App from '../../components/app/App';
+---
+
+<!--
+  SPA de Skyland: lobby, juegos y backoffice.
+  Toda la interacción vive en React (client:only); Astro solo empaqueta.
+  Las rutas hijas (/app/play/x, /app/backoffice) caen aquí vía public/_redirects (SPA fallback).
+-->
+<Layout title="Skyland">
+  <App client:only="react" />
+</Layout>

@@ -1,0 +1,18 @@
+---
+import Layout from '../layouts/Base.astro';
+import LoginForm from '../components/LoginForm';
+---
+
+<Layout title="Entrar — Skyland">
+  <main class="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
+    <a href="/" class="mb-8 text-center text-2xl font-black tracking-tight text-amber-400">
+      🎲 Skyland
+    </a>
+    <div class="rounded-2xl border border-white/10 bg-zinc-900 p-6">
+      <LoginForm client:load />
+    </div>
+    <p class="mt-6 text-center text-xs text-zinc-500">
+      Al crear una cuenta confirmas que tienes 18 años o más y aceptas los términos.
+    </p>
+  </main>
+</Layout>

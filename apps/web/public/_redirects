@@ -1,0 +1,2 @@
+# SPA fallback: cualquier subruta de /app sirve la entrada de la SPA
+/app/* /app 200
