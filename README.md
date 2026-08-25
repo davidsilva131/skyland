@@ -42,10 +42,9 @@ Requiere Postgres local: `docker compose -f infra/docker-compose.dev.yml up -d` 
 ### Frontend (`apps/web`)
 
 ```bash
-cd apps/web
-npm install
-npm run dev
-npm run build   # genera el estático para Cloudflare Pages
+pnpm install          # instala dependencias (workspaces desde la raíz)
+pnpm dev:web          # dev server desde la raíz (o cd apps/web && pnpm dev)
+pnpm build:web        # genera el estático para Cloudflare Pages
 ```
 
 ## Reglas de oro
