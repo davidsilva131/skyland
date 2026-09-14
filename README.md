@@ -7,8 +7,8 @@ Plataforma de apuestas multi-juego (latino tradicional: animalitos, caballos y m
 | Capa | Tecnología | Deploy |
 |---|---|---|
 | Frontend | Astro (público) + React SPA en `/app`, TailwindCSS, PWA | Cloudflare Pages |
-| Backend | Python + FastAPI (monolito modular) + worker | Railway |
-| Datos | PostgreSQL 16 (SQLAlchemy 2 + Alembic) · Upstash Redis/QStash | Railway / Upstash |
+| Backend | Go 1.27 (monolito modular + worker, pgx/v5) | Railway |
+| Datos | PostgreSQL 16 (pgx + golang-migrate) · Upstash Redis/QStash | Railway / Upstash |
 | Tiempo real | SSE (contador de sorteo, resultados) | — |
 | CI/CD | GitHub Actions → CF Pages + Railway | — |
 
@@ -26,18 +26,20 @@ docs/        # ADRs + docs de agentes
 
 ## Desarrollo
 
-### Backend (`apps/api`)
+### Backend (`apps/api` — Go)
 
 ```bash
+# requiere Postgres local: docker compose -f infra/docker-compose.dev.yml up -d
+# y apps/api/.env (ver .env.example)
+
 cd apps/api
-uv sync                 # instala dependencias
-uv run alembic upgrade head   # migraciones
-uv run uvicorn app.main:app --reload
-# worker en otra terminal:
-uv run python worker.py
+go test ./...                       # tests
+go run ./cmd/migrate up  (o: migrate -path migrations -database "$SKYLAND_DATABASE_URL" up)
+go run ./cmd/api                    # API en :8080 (usa PORT para cambiar)
+go run ./cmd/worker                 # worker en otra terminal
 ```
 
-Requiere Postgres local: `docker compose -f infra/docker-compose.dev.yml up -d` y `.env` (ver `.env.example`).
+Código en `cmd/{api,worker}` + `internal/{auth,wallets,games,payments,notifications,admin}` (monolito modular — ADR-0003). Migraciones: golang-migrate (`migrations/`).
 
 ### Frontend (`apps/web`)
 
@@ -52,5 +54,5 @@ pnpm build:web        # genera el estático para Cloudflare Pages
 1. El **camino del dinero** (apuesta → débito → ledger) es una transacción ACID local en Postgres. Sin transacciones distribuidas.
 2. Nada de lógica de dinero en Edge Functions / serverless.
 3. Montos en mínima unidad + `currency` (multi-moneda lista desde el día 1).
-4. Contrato front↔back generado desde OpenAPI (FastAPI → cliente TS). Cero tipos a mano.
-5. RNG CSPRNG con `secrets` + `pg_advisory_lock` en sorteos.
+4. Contrato front↔back: OpenAPI spec-first (`oapi-codegen` → Go, `openapi-typescript` → TS). Cero tipos a mano.
+5. RNG CSPRNG con `crypto/rand` + `pg_advisory_lock` en sorteos.
