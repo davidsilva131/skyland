@@ -1,0 +1,1 @@
+-- Reversión de la migración inicial (vacía).

@@ -1,0 +1,4 @@
+-- Migración inicial: vacía (placeholder del esquema).
+-- El modelo de dominio (players, wallets + ledger de doble entrada, games, bets, rounds,
+-- recargas) llega con la primera implementación de wallets, siguiendo ADR-0001 Rev. 4:
+-- montos en mínima unidad + currency, camino del dinero en transacción ACID local.
