@@ -7,6 +7,10 @@
 | Término | Definición canónica |
 |---|---|
 | **Jugador** | Usuario registrado con saldo que participa en los juegos de la plataforma. |
+| **Visitante** | Persona sin sesión iniciada. Solo accede a la Portada y a las pantallas de entrar/crear cuenta; no apuesta ni recarga. |
+| **Sesión** | Vínculo autenticado y revocable entre una persona y la plataforma, que la identifica como Jugador (o como personal de la Casa) mientras la usa. |
+| **Portada** | Página pública de entrada que presenta la plataforma y enruta a entrar o crear cuenta. Es el único escaparate abierto al Visitante. |
+| **Lobby** | Catálogo de juegos dentro de la plataforma, donde el Jugador elige en qué jugar. |
 | **Casa** | Operador de la plataforma (Skyland). Contraparte de cada apuesta. |
 | **Saldo** | Dinero disponible del jugador para apostar. Hoy en **VES (bolívares)**; el diseño es **multi-moneda** desde el día 1. |
 | **Recarga** | Depósito de fondos realizado por el jugador para aumentar su saldo. Vía **pago móvil** (Venezuela). |
@@ -23,3 +27,10 @@
 | **Mercado de apuesta** | Tipo de jugada disponible dentro de un juego (ej: animal suelto, caballo — combinación de animales). |
 | **Concurrente** | Usuarios conectados/apostando simultáneamente (objetivo: 100–1.000 con picos en horarios de sorteo). |
 | **Credencial bancaria** | Claves de API de conciliación (BDVenLínea Empresa / Mercantil) que permiten verificar pagos móviles automáticamente. |
+
+## Términos descartados
+
+| Término | Por qué | Usar en su lugar |
+|---|---|---|
+| **Invitado** | Sugiere navegación anónima del Lobby; el modelo no tiene navegación anónima (`/app` es solo para Jugadores). | **Visitante** |
+| **Landing** | Anglicismo; el término canónico de la página pública de entrada. | **Portada** |

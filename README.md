@@ -18,8 +18,8 @@ Decisiones de arquitectura en [`docs/adr/`](docs/adr/). Glosario del dominio en 
 
 ```
 apps/
-├── web/     # Astro + React (landing, login, SPA /app: lobby, juegos, backoffice)
-└── api/     # FastAPI: app/ (módulos auth, wallets, games, payments, notifications, admin) + worker.py
+├── web/     # Astro + React (portada, login, SPA /app: lobby, juegos, backoffice)
+└── api/     # Go: cmd/{api,worker} + internal/{auth,wallets,games,payments,notifications,admin} + migrations/
 infra/       # docker-compose.dev.yml (Postgres local), Dockerfiles
 docs/        # ADRs + docs de agentes
 ```
