@@ -1,0 +1,25 @@
+---
+const faqs = [
+  ['¿Qué es Skyland?', 'Una plataforma venezolana para jugar a los juegos tradicionales: animalitos hoy, caballos pronto, con recargas por pago móvil.'],
+  ['¿Cómo recargo mi saldo?', 'Haces una transferencia por pago móvil a la cuenta de la Casa y reportas la referencia de 6 dígitos. Al principio la verificamos manualmente.'],
+  ['¿Los animalitos son la lotería oficial?', 'No. Corremos sorteos propios con el generador de números de la plataforma. No dependemos de la lotería oficial.'],
+  ['¿Cuánto cuesta crear cuenta?', 'Nada. Crear cuenta es gratis; solo necesitas ser mayor de 18 años.'],
+  ['¿Cuándo abren los juegos?', 'Animalitos abre primero. Mientras tanto lo verás marcado como "Próximamente" en el catálogo.'],
+  ['¿Es seguro jugar aquí?', 'Trabajamos con juego responsable, límites claros y sorteos de la Casa auditables. El acceso es exclusivo para mayores de 18.'],
+];
+---
+
+<section id="preguntas" class="py-12">
+  <h2 class="text-2xl font-black tracking-tight text-white">Preguntas frecuentes</h2>
+  <div class="mt-6 grid gap-3">
+    {faqs.map(([q, a]) => (
+      <details class="group rounded-2xl border border-white/10 bg-zinc-900 open:border-amber-400/30">
+        <summary class="flex cursor-pointer items-center justify-between gap-4 p-5 font-semibold text-white marker:hidden [&::-webkit-details-marker]:hidden">
+          {q}
+          <span class="text-amber-400 transition group-open:rotate-45">+</span>
+        </summary>
+        <p class="px-5 pb-5 text-sm text-zinc-400">{a}</p>
+      </details>
+    ))}
+  </div>
+</section>
