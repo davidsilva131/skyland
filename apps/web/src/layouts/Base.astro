@@ -4,6 +4,7 @@ interface Props {
 }
 
 const { title = 'Skyland' } = Astro.props;
+import '../styles/global.css';
 ---
 
 <!doctype html>
@@ -13,6 +14,10 @@ const { title = 'Skyland' } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Skyland — juega a los animalitos, caballos y más. Recarga con pago móvil." />
     <meta name="theme-color" content="#09090b" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content="Los juegos tradicionales venezolanos, ahora en línea. Recarga con pago móvil, juega animalitos y pronto caballos." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
   </head>

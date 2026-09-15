@@ -32,3 +32,6 @@ Thumbs.db
 .cache/
 coverage/
 htmlcov/
+
+# Agent scratch (Hermes)
+.hermes/

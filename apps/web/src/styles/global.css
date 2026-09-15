@@ -1,1 +1,22 @@
 @import "tailwindcss";
+
+/* Gold theme: brighter base, darker/muted on hover */
+@theme {
+  --color-amber-300: #f2d14b;
+  --color-amber-400: #ffd700;
+  --color-amber-500: #c9a227;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-amber-400);
+    outline-offset: 2px;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-amber-400) 30%, transparent);
+  }
+}
