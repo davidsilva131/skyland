@@ -1,21 +1,5 @@
 import { Link } from 'react-router-dom';
-
-const games = [
-  {
-    slug: 'animalitos',
-    name: 'Animalitos',
-    emoji: '🐓',
-    description: 'Sorteos rápidos con pagos fijos. ¡El clásico venezolano!',
-    status: 'soon' as const,
-  },
-  {
-    slug: 'caballos',
-    name: 'Caballos',
-    emoji: '🐎',
-    description: 'La emoción de las carreras. Próximamente.',
-    status: 'soon' as const,
-  },
-];
+import { games, statusLabel } from '../../../data/games';
 
 export default function Lobby() {
   return (
@@ -36,11 +20,9 @@ export default function Lobby() {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="font-bold text-white">{game.name}</h2>
-                {game.status === 'soon' && (
-                  <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
-                    Próximamente
-                  </span>
-                )}
+                <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
+                  {statusLabel(game.status)}
+                </span>
               </div>
               <p className="mt-0.5 text-sm text-zinc-400">{game.description}</p>
             </div>
