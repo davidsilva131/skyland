@@ -7,7 +7,7 @@
 
 ## 1. Scope
 
-End-to-end player auth: OpenAPI contract with codegen on both sides, Go `internal/auth` + `internal/ratelimit`, migration `000003` (`players` + `sessions`), `LoginForm` rewrite, SPA session gate + logout, and the `/terminos` page registration links to (the map flagged it as a blocker; a stub with structure ships here, final legal copy is David's).
+End-to-end player auth: OpenAPI contract with codegen on both sides, Go `internal/auth` + `internal/ratelimit`, migration `000003` (`players` + `sessions`), `LoginForm` rewrite, SPA session gate + logout, and the `/terminos` page that registration links to (the map flagged it as a blocker; a stub with structure ships here, final legal copy is David's).
 
 **Vocabulary**: English here maps to `CONTEXT.md` — player = **Jugador**, session = **Sesión**. Code identifiers are English (`players.id`, `player_id`); wallets' `jugador_id` bigint columns predate this spec, and reconciling that identifier split belongs to the effort that wires wallets to `players` (domain note, not this spec). Spanish appears in this spec only as **quoted product copy** (error strings, page text) — the product language; all prose is English per `AGENTS.md`.
 
@@ -32,8 +32,8 @@ Problem { title: string, status: int, detail: string, code: string }
 
 | Endpoint | Request | Success | Errors |
 |---|---|---|---|
-| `POST /auth/register` | `{ email, password, birthdate, acceptsTerms }` | `201` + Player + Set-Cookie | `409 email_taken` · `422 validation / underage / terms_not_accepted` · `429 rate_limited` (shares the per-IP limiter) · `400 validation` (malformed JSON) |
-| `POST /auth/login` | `{ email, password }` | `200` + Player + Set-Cookie | `401 invalid_credentials` · `429 rate_limited` · `400` |
+| `POST /auth/register` | `{ email, password, birthdate, acceptsTerms }` | `201` + Player + Set-Cookie | `409 email_taken` · `422 validation / underage / terms_not_accepted` · `429 rate_limited` (shares the per-IP limiter) · `400 validation` (malformed JSON) · `403 origin_rejected` |
+| `POST /auth/login` | `{ email, password }` | `200` + Player + Set-Cookie | `401 invalid_credentials` · `429 rate_limited` · `400` · `403 origin_rejected` |
 | `POST /auth/logout` | — | `204` regardless of session validity, idempotent (clears cookie) | `403 origin_rejected` |
 | `GET /auth/me` | — | `200` + Player (refreshes rolling TTL) | `401 unauthenticated` |
 
@@ -197,7 +197,7 @@ Seams pre-agreed here: the service interface (fake store) and the `Limiter` inte
 6. `ratelimit` fake + `redis.go`, wired into login/register.
 7. `postgres.go` — gated tests.
 8. `httpapi` wiring; drop `JWTSecret`.
-9. Frontend: types gen → `auth.ts` → `LoginForm` → session/gate/`AppLayout` → `/terminos` → `_redirects` + vite proxy.
+9. Frontend: types gen → `auth.ts` → `LoginForm` → session/gate/`AppLayout` → `/terminos` → vite proxy.
 10. Full gates once at the end: `go test ./...`, `go vet`, `pnpm check`, `pnpm build:web`, manual smoke.
 
 ## 8. Acceptance criteria
