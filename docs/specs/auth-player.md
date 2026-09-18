@@ -7,7 +7,7 @@
 
 ## 1. Scope
 
-End-to-end player auth: OpenAPI contract with codegen on both sides, Go `internal/auth` + `internal/ratelimit`, migration `000003` (`players` + `sessions`), `LoginForm` rewrite, SPA session gate + logout, and the `/terminos` page that registration links to (the map flagged it as a blocker; a stub with structure ships here, final legal copy is David's).
+End-to-end player auth: OpenAPI contract with codegen on both sides, Go `internal/auth` + `internal/ratelimit`, migration `000003` (`players` + `sessions`), `LoginForm` rewrite, SPA session gate + logout, and the `/terminos` page that registration links to (the map flagged it as a blocker; a stub with structure ships here, final legal copy lands before the site is announced — David's).
 
 **Vocabulary**: English here maps to `CONTEXT.md` — player = **Jugador**, session = **Sesión**. Code identifiers are English (`players.id`, `player_id`); wallets' `jugador_id` bigint columns predate this spec, and reconciling that identifier split belongs to the effort that wires wallets to `players` (domain note, not this spec). Spanish appears in this spec only as **quoted product copy** (error strings, page text) — the product language; all prose is English per `AGENTS.md`.
 
@@ -143,10 +143,12 @@ Wiring & config:
 
 ## 5. Frontend — `apps/web`
 
-**Same-site API** **[spec-added]** — a cross-*site* fetch never carries the `SameSite=Lax` cookie, so the API must live on the same site (same registrable domain) as the web app:
+**Same-origin API** **[spec-added]** — a cross-*site* fetch never carries the `SameSite=Lax` cookie, so the browser must reach the API on the same origin. Deploy stays on free tiers and there is **no custom domain** (decided 2026-09-18); both `skyland.pages.dev` and Railway's `*.up.railway.app` are public suffixes, so the subdomain route is out:
 
-- Prod: serve the API on a subdomain of the web app's own domain (e.g. `https://api.<domain>` — Railway custom domain), set `PUBLIC_API_URL=https://api.<domain>`, keep the credentialed CORS middleware (same site, different origin). `SameSite` is site-scoped, so `Lax` cookies flow. Note `skyland.pages.dev` is a public suffix — the subdomain trick needs the web app on its own custom domain. Cloudflare Pages `_redirects` **cannot** proxy external domains, so that path is ruled out.
+- Prod: **Cloudflare Pages Function proxy** — `apps/web/functions/api/[[path]].ts` (~15 lines): runs on `skyland.pages.dev/api/*`, forwards method + body + `Cookie`/`Origin`/`Content-Type` to the Railway API (`RAILWAY_API_URL` Pages env var) and streams the response back, `Set-Cookie` included — the session cookie lands on `skyland.pages.dev` (host cookies work on public-suffix hosts). `PUBLIC_API_URL` stays unset → `API_BASE = '/api'`.
 - Dev: vite proxy in `astro.config.mjs` — `server.proxy` sends `/api` → `http://localhost:8080`; `PUBLIC_API_URL` stays unset → `API_BASE = '/api'`, no CORS involved.
+- Upgrade path: buy a domain → delete the Function, serve the API on `api.<domain>`, set `PUBLIC_API_URL`, keep the credentialed CORS middleware (same site, different origin).
+- Ruled out: `SameSite=None` (Safari blocks third-party cookies, Chrome is phasing them out — broken on the players' phones); serving the Astro `dist/` from the Go binary (contradicts ADR-0001's deploy shape, couples web and API deploys).
 
 | File | Work |
 |---|---|
@@ -197,8 +199,10 @@ Seams pre-agreed here: the service interface (fake store) and the `Limiter` inte
 6. `ratelimit` fake + `redis.go`, wired into login/register.
 7. `postgres.go` — gated tests.
 8. `httpapi` wiring; drop `JWTSecret`.
-9. Frontend: types gen → `auth.ts` → `LoginForm` → session/gate/`AppLayout` → `/terminos` → vite proxy.
+9. Frontend: types gen → `auth.ts` → `LoginForm` → session/gate/`AppLayout` → `/terminos` → vite proxy + Pages Function proxy (`functions/api/[[path]].ts`).
 10. Full gates once at the end: `go test ./...`, `go vet`, `pnpm check`, `pnpm build:web`, manual smoke.
+
+Implementation runs as **two `/implement` sessions** (decided 2026-09-18): backend (steps 1–8), then frontend (steps 9–10). One spec, two commits.
 
 ## 8. Acceptance criteria
 
