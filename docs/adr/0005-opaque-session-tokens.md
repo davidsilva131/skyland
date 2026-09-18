@@ -1,7 +1,7 @@
 # ADR-0005 — Sessions: opaque tokens in Postgres (not JWT)
 
 - **Date**: 2026-09-15
-- **Status**: Accepted
+- **Status**: Accepted (first ADR written in English — `AGENTS.md` now requires it; older ADRs convert when next touched)
 - **Context**: Player auth needs a session mechanism for a real-money platform. Two candidates: stateless JWTs (signed, self-contained, verifiable without a store) or opaque tokens with a server-side session store. This was a real trade-off surfaced while charting the login map (#1), and a `SKYLAND_JWT_SECRET` config value had already scaffolding-existed from before the decision was made.
 - **Decision**: Sessions are **opaque 256-bit tokens** (`crypto/rand`, base64url) delivered in an HttpOnly cookie (`skyland_session`, `Secure; SameSite=Lax; Path=/`). Only the **sha-256 hash** of the token is stored, in a `sessions` table in Postgres; every authenticated request resolves the token with one indexed SELECT. Rolling 7-day TTL refreshed by `/auth/me`, 30-day absolute cap, revocation = `UPDATE revoked_at`. `JWTSecret` is removed from config — there is no signing key to manage.
 - **Why**: Logout and revocation must be real on a money platform — a JWT cannot be un-issued without the very server-side state it exists to avoid. Postgres is already the source of truth and the system of record; one indexed lookup per request is negligible at the MVP target (100–1k concurrent players). The token leaks nothing if a log or header captures it (no claims inside), and a stolen cookie is cut off by revoke.

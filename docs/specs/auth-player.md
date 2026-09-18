@@ -9,7 +9,9 @@
 
 End-to-end player auth: OpenAPI contract with codegen on both sides, Go `internal/auth` + `internal/ratelimit`, migration `000003` (`players` + `sessions`), `LoginForm` rewrite, SPA session gate + logout, and the `/terminos` page registration links to (the map flagged it as a blocker; a stub with structure ships here, final legal copy is David's).
 
-**Non-goals** (locked): password recovery, email verification / OTP, admin login / RBAC, MFA, login-screen visual redesign, balance in auth payloads (wallets stays a separate fetch), single-session enforcement (concurrent sessions per player are allowed), wallets alignment — `balances`/`ledger_entries` keep `bigint jugador_id`; wiring `players.id` into wallets is #9's.
+**Vocabulary**: English here maps to `CONTEXT.md` — player = **Jugador**, session = **Sesión**. Code identifiers are English (`players.id`, `player_id`); wallets' `jugador_id` bigint columns predate this spec, and reconciling that identifier split belongs to the effort that wires wallets to `players` (domain note, not this spec). Spanish appears in this spec only as **quoted product copy** (error strings, page text) — the product language; all prose is English per `AGENTS.md`.
+
+**Non-goals** (locked): password recovery, email verification / OTP, admin login / RBAC, MFA, login-screen visual redesign, balance in auth payloads (wallets stays a separate fetch), single-session enforcement (concurrent sessions per player are allowed), wallets alignment — `balances`/`ledger_entries` keep `bigint jugador_id`; wiring `players.id` in is future work (see Vocabulary).
 
 ## 2. OpenAPI contract
 
@@ -32,7 +34,7 @@ Problem { title: string, status: int, detail: string, code: string }
 |---|---|---|---|
 | `POST /auth/register` | `{ email, password, birthdate, acceptsTerms }` | `201` + Player + Set-Cookie | `409 email_taken` · `422 validation / underage / terms_not_accepted` · `429 rate_limited` (shares the per-IP limiter) · `400 validation` (malformed JSON) |
 | `POST /auth/login` | `{ email, password }` | `200` + Player + Set-Cookie | `401 invalid_credentials` · `429 rate_limited` · `400` |
-| `POST /auth/logout` | — | `204` always, idempotent (clears cookie) | `403 origin_rejected` |
+| `POST /auth/logout` | — | `204` regardless of session validity, idempotent (clears cookie) | `403 origin_rejected` |
 | `GET /auth/me` | — | `200` + Player (refreshes rolling TTL) | `401 unauthenticated` |
 
 Component schemas:
@@ -56,7 +58,7 @@ Cookie (locked #4):
 - `HttpOnly; Secure; SameSite=Lax; Path=/`; Max-Age 7 days, absolute cap 30 days (`sessions.absolute_expires_at`).
 - **Rolling is two-sided** **[spec-added]**: `/auth/me` refreshes the DB row **and re-sends `Set-Cookie`** with a fresh 7-day Max-Age — a browser-side cookie that only counts down from login would void the rolling TTL.
 - Logout re-sets the same cookie with `Max-Age=0`.
-- No dev-only flag branching: browsers accept `Secure` cookies on localhost.
+- No dev-only flag branching: Chrome/Firefox/Edge treat `http://localhost` as trustworthy and accept `Secure` cookies; Safari does not — use a Chromium/Firefox browser for local dev.
 
 ## 3. Database — migration `000003`
 
@@ -100,18 +102,18 @@ Notes:
 
 ## 4. Go backend — `internal/auth` + `internal/ratelimit`
 
-Module layout mirrors wallets: `Register(mux, …)` onto the shared httpapi mux, module-local HTTP helpers (do not refactor wallets' duplicated helpers in this effort), fake + pgx adapters behind one interface.
+Module layout mirrors wallets: `Register(mux, …)` onto the shared httpapi mux, module-local HTTP helpers (do not refactor wallets' duplicated helpers in this effort), fake + pgx adapters behind one interface. `ponytail:` debt — `writeJSON`/`writeErr`/`decodeJSON` then exist in three modules; extract a shared internal HTTP helper on the next touch of any of them.
 
 | File | Responsibility |
 |---|---|
-| `auth.go` | Service interface + types: `Register`, `Login`, `Verify`, `Revoke` (#9's language). `Player` struct. `TERMS_VERSION = "2026-09-01"` const — the future Terms page bumps it and re-acceptance becomes required. |
+| `auth.go` | Service interface + types: `Register`, `Login`, `Verify`, `Revoke` (#9's language). `Player` struct. `TERMS_VERSION = "2026-09-01"` const — source of truth for the terms version; `terminos.astro` displays the same value and must change in the same commit when the const bumps (re-acceptance then becomes required). |
 | `password.go` | argon2id: m=19456 KiB, t=2, p=1, salt 16 B, key 32 B, PHC string; constant-time verify. Embedded common-password list (~top 1000, SecLists, license header in-file), lowercase compare — exact cutoff not load-bearing. |
 | `postgres.go` | pgx adapter: insert player (unique violation → `email_taken`), insert session, verify by `token_hash` (one indexed SELECT joining player), rolling-refresh UPDATE, revoke UPDATE. |
 | `fake.go` | In-memory store for handler tests (and the dev fake server). |
 | `http.go` | Handlers implementing the generated `ServerInterface`; problem+json writer; cookie set/clear; client-IP extraction; Origin check. |
 | `oapi_gen.go` | Generated. Do not edit. |
 
-Client IP **[spec-added]**: leftmost `X-Forwarded-For` (Railway sets it) → `RemoteAddr` host → `0.0.0.0` fallback. Same value feeds `created_ip` and the rate-limit key.
+Client IP **[spec-added]**: leftmost `X-Forwarded-For` → `RemoteAddr` host → `0.0.0.0` fallback. Same value feeds `created_ip` and the rate-limit key. `ponytail:` assumes the edge proxy sets XFF to the real client; if it *appends* to a spoofable header, switch to rightmost — verify with one curl against the deployed API before trusting the per-IP limiter.
 
 `internal/ratelimit/redis.go` — normative shape from #2:
 
@@ -127,7 +129,7 @@ func (l *Limiter) Allow(ctx context.Context, key string, limit int, window time.
 
 Service semantics:
 
-- **Register**: trim + lowercase email → validate (format ≤254; password 8–128 and not in the common list; birthdate parses `YYYY-MM-DD`, not future, ≥18 computed in `America/Caracas` **[spec-added: timezone]**; `acceptsTerms` true) → argon2 hash → insert player (`409` on taken) → create session → `201` + cookie.
+- **Register**: rate-limit check (IP budget only — shared counter with login) → trim + lowercase email → validate (format ≤254; password 8–128 and not in the common list; birthdate parses `YYYY-MM-DD`, not future, ≥18 computed in `America/Caracas` **[spec-added: timezone]**; `acceptsTerms` true) → argon2 hash → insert player (`409` on taken) → create session → `201` + cookie.
 - **Login**: rate-limit check **first** (it protects the argon2 cost) → fetch player by email; unknown email runs a dummy argon2 verify against a fixed hash **[spec-added: anti-enumeration timing]** → verify → create session → `200` + cookie + DEL email counter.
 - **Verify** (`/me`): sha-256(token) → `SELECT … WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now() AND absolute_expires_at > now()` → refresh `expires_at = least(now()+7d, absolute_expires_at)` → Player. Missing cookie, unknown/revoked/expired token → `401 unauthenticated`.
 - **Revoke** (logout): `UPDATE … SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`; clear cookie; `204` regardless.
@@ -136,16 +138,15 @@ Service semantics:
 Wiring & config:
 
 - `internal/httpapi/httpapi.go`: replace the `GET /api/v1/auth/status` stub with the real `auth.Register(...)` (parity with `wallets.Register`).
-- `internal/platform/config`: **remove `JWTSecret`** and drop `SKYLAND_JWT_SECRET` from `.env.example` — obsolete under opaque tokens (ADR-0005). No new env vars: the Redis URL already exists; TTLs, budgets and the terms version are constants, not config (values that never change don't earn config).
+- `internal/platform/config`: **remove `JWTSecret`** and drop `SKYLAND_JWT_SECRET` from `.env.example` — obsolete under opaque tokens (ADR-0005) **[spec-added]**. No new env vars: the Redis URL already exists; TTLs, budgets and the terms version are constants, not config (values that never change don't earn config).
 - New Go deps, all mandated: promote `golang.org/x/crypto` (already indirect — argon2), `github.com/redis/go-redis/v9` (#2), oapi-codegen as a `go tool`. Nothing else.
 
 ## 5. Frontend — `apps/web`
 
-**Same-origin API everywhere** (locked `SameSite=Lax` demands it):
+**Same-site API** **[spec-added]** — a cross-*site* fetch never carries the `SameSite=Lax` cookie, so the API must live on the same site (same registrable domain) as the web app:
 
-- Dev: vite proxy in `astro.config.mjs` — `server.proxy` sends `/api` → `http://localhost:8080`. Dev stops depending on CORS entirely.
-- Prod: `public/_redirects` gains `/api/* https://<railway-api-host>/api/:splat 200` (Cloudflare Pages proxy; the host is a deploy value).
-- `PUBLIC_API_URL` stays unset → `API_BASE = '/api'`. The CORS middleware stays for direct-API consumers.
+- Prod: serve the API on a subdomain of the web app's own domain (e.g. `https://api.<domain>` — Railway custom domain), set `PUBLIC_API_URL=https://api.<domain>`, keep the credentialed CORS middleware (same site, different origin). `SameSite` is site-scoped, so `Lax` cookies flow. Note `skyland.pages.dev` is a public suffix — the subdomain trick needs the web app on its own custom domain. Cloudflare Pages `_redirects` **cannot** proxy external domains, so that path is ruled out.
+- Dev: vite proxy in `astro.config.mjs` — `server.proxy` sends `/api` → `http://localhost:8080`; `PUBLIC_API_URL` stays unset → `API_BASE = '/api'`, no CORS involved.
 
 | File | Work |
 |---|---|
@@ -167,16 +168,17 @@ Error copy (code → Spanish, top-level box; `validation` shows the server `deta
 | `terms_not_accepted` | Debes aceptar los términos para continuar. |
 | `rate_limited` | Demasiados intentos. Espera un momento y prueba de nuevo. |
 | `unauthenticated` | Tu sesión expiró. Entra de nuevo. |
+| `origin_rejected` | Petición no permitida desde este origen. |
 | network / other | No se pudo conectar con el servidor. Intenta más tarde. |
 
 ## 6. Test plan
 
 Backend (`go test ./...`, `go vet`):
 
-1. `http_test.go` — contract tests over the mux with fake store + fake limiter (`wallets_http_test.go` pattern): every status + code in the §2 table; problem+json content-type; cookie attributes (name, Max-Age, Path, HttpOnly, Secure, SameSite); `Retry-After` on 429; Origin reject → 403; logout idempotent (204 twice); `/me` 401 for missing / bogus / revoked / expired cookie.
+1. `http_test.go` — contract tests over the mux with fake store + fake limiter (pattern of `internal/httpapi/wallets_http_test.go`): every status + code in the §2 table; problem+json content-type; cookie attributes (name, Max-Age, Path, HttpOnly, Secure, SameSite); `Retry-After` on 429; Origin reject → 403; logout idempotent (204 twice); `/me` 401 for missing / bogus / revoked / expired cookie.
 2. `password_test.go` — hash/verify roundtrip; wrong password fails; params are exactly m/t/p/salt/key above; common-password rejected; age edges: 17y364d → reject, exactly-18 → accept, future date → reject.
 3. `postgres_test.go` — gated on `SKYLAND_TEST_DATABASE_URL` (wallets pattern): taken email maps to 409; token stored hashed (plaintext appears nowhere); revoke → `/me` 401; rolling refresh respects the absolute cap.
-4. `ratelimit` — fake-limiter budget logic (5th email attempt blocks, 21st IP attempt blocks, register counts against the IP budget); Redis impl integration optional via `SKYLAND_TEST_REDIS_URL`.
+4. `ratelimit` — fake-limiter budget logic (attempts 1–5 pass on email, the 6th blocks; attempts 1–20 pass on IP, the 21st blocks; register counts against the IP budget); Redis impl integration optional via `SKYLAND_TEST_REDIS_URL`.
 5. `BenchmarkHash` — documented target ≤ 500 ms/hash, a benchmark not a unit assert (hardware varies).
 
 Frontend: `pnpm gen:api` regenerates cleanly; `pnpm check` (astro check) clean; `pnpm build:web` builds `/`, `/app`, `/login`, `/terminos`.
