@@ -33,7 +33,7 @@ func TestTableAuth(t *testing.T) {
 			s := tc.setup(t)
 			now := time.Now()
 
-			// Taken email → 409 ( шутка aparte, ErrEmailTaken directo).
+			// Taken email → 409 (ErrEmailTaken directo, sin HTTP).
 			if _, err := s.Register(ctx, "toma@ejemplo.com", "contrasenasagrada-1", "2000-01-15", true, now, "203.0.113.7"); err != nil {
 				t.Fatalf("register: %v", err)
 			}
@@ -73,7 +73,7 @@ func TestPgRollingCap(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 	// Emular 25 días de /me: 25 refreshes de 7 días a partir de +25d no deben
-	// superar el cap absoluto de 30d. El fake imponcap limita con lógica
+	// superar el cap absoluto de 30d. El fake impone el cap con lógica
 	// equivalente a la del SQL (least(now()+7d, absolute)).
 	for i := 0; i < 25; i++ {
 		if _, err := s.Verify(ctx, res.Token); err != nil {

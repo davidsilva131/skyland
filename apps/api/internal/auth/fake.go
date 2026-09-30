@@ -162,9 +162,6 @@ func (f *fakeStore) Revoke(ctx context.Context, token string) error {
 	return nil // idempotente: revocar lo que no existe no falla
 }
 
-// FIX: unused
-var _ = strings.TrimSpace
-
 // sha256Sum: sha-256 del token (el único identificador que toca el store).
 func sha256Sum(token string) [32]byte {
 	return sha256.Sum256([]byte(token))

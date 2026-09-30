@@ -119,7 +119,7 @@ func (s postgresStore) Login(ctx context.Context, email, password string, now ti
 func (s postgresStore) Verify(ctx context.Context, token string) (Player, error) {
 	sum := sha256Sum(token)
 	row := s.pool.QueryRow(ctx, `
-		SELECT p.id, p.email::text, p.birthdate, p.created_at, se.expires_at, se.absolute_expires_at
+		SELECT p.id, p.email::text, p.birthdate, p.created_at
 		FROM sessions se
 		JOIN players p ON p.id = se.player_id
 		WHERE se.token_hash = $1
@@ -127,23 +127,28 @@ func (s postgresStore) Verify(ctx context.Context, token string) (Player, error)
 		  AND se.expires_at > now()
 		  AND se.absolute_expires_at > now()`, sum[:])
 	var (
-		id          openapi_types.UUID
-		email       string
-		birthdate   time.Time
-		createdAt   time.Time
-		expires     time.Time
-		absoluteExp time.Time
+		id        openapi_types.UUID
+		email     string
+		birthdate time.Time
+		createdAt time.Time
 	)
-	if err := row.Scan(&id, &email, &birthdate, &createdAt, &expires, &absoluteExp); err != nil {
+	if err := row.Scan(&id, &email, &birthdate, &createdAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Player{}, ErrUnauthenticated
 		}
 		return Player{}, err
 	}
-	// Rolling refresh: expires_at = least(now()+7d, absolute_expires_at).
-	nuevo := minTime(time.Now().Add(7*24*time.Hour), absoluteExp)
-	if _, err := s.pool.Exec(ctx,
-		`UPDATE sessions SET expires_at = $2 WHERE token_hash = $1`, sum[:], nuevo); err != nil {
+	// Rolling refresh: expires_at = least(now()+7d, absolute_expires_at),
+	// computado por el reloj de la BD (no el de la app) y solo sobre filas
+	// aún válidas — un skew del reloj de la app no resucita sesiones
+	// expiradas (code review #9/#11, M1).
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE sessions
+		SET expires_at = least(now() + interval '7 days', absolute_expires_at)
+		WHERE token_hash = $1
+		  AND revoked_at IS NULL
+		  AND expires_at > now()
+		  AND absolute_expires_at > now()`, sum[:]); err != nil {
 		return Player{}, err
 	}
 	return newPlayer(id, email, birthdate, createdAt), nil

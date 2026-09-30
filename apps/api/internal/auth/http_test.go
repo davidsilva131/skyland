@@ -147,6 +147,7 @@ func TestContractRegisterErrors(t *testing.T) {
 		{"sin términos", regBody("terminos@ejemplo.com", "contrasenasagrada-1", "2000-01-15", false), http.StatusUnprocessableEntity, TermsNotAccepted},
 		{"password común", regBody("comun@ejemplo.com", "password", "2000-01-15", true), http.StatusUnprocessableEntity, Validation},
 		{"birthdate roto (formato no ISO)", regBody("roto@ejemplo.com", "contrasenasagrada-1", "31-12-2000", true), http.StatusBadRequest, Validation},
+		{"birthdate ausente (zero date)", `{"email":"sinfecha@ejemplo.com","password":"contrasenasagrada-1","acceptsTerms":true}`, http.StatusUnprocessableEntity, Validation},
 		{"password corta", regBody("corta@ejemplo.com", "corta", "2000-01-15", true), http.StatusUnprocessableEntity, Validation},
 	}
 	for _, tc := range cases {

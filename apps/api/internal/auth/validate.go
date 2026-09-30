@@ -23,7 +23,7 @@ var (
 	errTerms        = errors.New("terms_not_accepted: Debes aceptar los términos para continuar")
 )
 
-// validationCode¿?: el error es un 422 del validate con código del enum —
+// validationCode: el error es un 422 del validate con código del enum —
 // devuelve (code, detail, true); los sentinels con prefijo "code: detail"
 // usan el prefijo como código.
 func validationCode(err error) (ProblemCode, string, bool) {
