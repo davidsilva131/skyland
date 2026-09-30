@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Skyland API — player auth
+  version: 0.1.0
+servers:
+  - url: /
+paths:
+  /auth/register:
+    post:
+      operationId: register
+      summary: Registro de jugador (lo loguea).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Jugador creado; se abre la sesión (cookie).
+          headers:
+            Set-Cookie:
+              description: skyland_session (HttpOnly, Secure, SameSite=Lax, Max-Age 7d).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '400':
+          $ref: '#/components/responses/ValidationProblem'
+        '403':
+          $ref: '#/components/responses/OriginProblem'
+        '409':
+          $ref: '#/components/responses/EmailTakenProblem'
+        '422':
+          $ref: '#/components/responses/UnprocessableProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+  /auth/login:
+    post:
+      operationId: login
+      summary: Inicio de sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sesión abierta (cookie).
+          headers:
+            Set-Cookie:
+              description: skyland_session (HttpOnly, Secure, SameSite=Lax, Max-Age 7d).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '400':
+          $ref: '#/components/responses/ValidationProblem'
+        '401':
+          $ref: '#/components/responses/InvalidCredentialsProblem'
+        '403':
+          $ref: '#/components/responses/OriginProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Cierra la sesión actual; idempotente.
+      responses:
+        '204':
+          description: Cookie borrada (Max-Age=0); 204 aunque la sesión no exista.
+          headers:
+            Set-Cookie:
+              description: skyland_session=; Max-Age=0.
+              schema:
+                type: string
+        '403':
+          $ref: '#/components/responses/OriginProblem'
+  /auth/me:
+    get:
+      operationId: me
+      summary: Jugador de la sesión; refresca el TTL rodante.
+      responses:
+        '200':
+          description: Jugador de la sesión.
+          headers:
+            Set-Cookie:
+              description: Re-envío de skyland_session con Max-Age fresco (TTL rodante).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '401':
+          $ref: '#/components/responses/UnauthenticatedProblem'
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, birthdate, acceptsTerms]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        birthdate:
+          type: string
+          format: date
+        acceptsTerms:
+          type: boolean
+          enum: [true]
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+    Player:
+      type: object
+      required: [id, email, birthdate, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        birthdate:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+    Problem:
+      type: object
+      required: [title, status, detail, code]
+      properties:
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          enum: [email_taken, invalid_credentials, underage, terms_not_accepted, rate_limited, validation, unauthenticated, origin_rejected]
+  responses:
+    ValidationProblem:
+      description: Cuerpo inválido → problem+json validation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableProblem:
+      description: Semántica inválida (menor / términos no aceptados) → problem+json.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    EmailTakenProblem:
+      description: El correo ya tiene cuenta → problem+json email_taken.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InvalidCredentialsProblem:
+      description: Credenciales inválidas → problem+json invalid_credentials.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RateLimitedProblem:
+      description: Presupuesto agotado → problem+json rate_limited + Retry-After.
+      headers:
+        Retry-After:
+          description: Segundos de espera sugeridos.
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnauthenticatedProblem:
+      description: Sin/inválida/expirada/revocada sesión → problem+json unauthenticated.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    OriginProblem:
+      description: Origen no permitido → problem+json origin_rejected.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/davidsilva131/skyland/apps/api/internal/auth"
 	"github.com/davidsilva131/skyland/apps/api/internal/platform/config"
+	"github.com/davidsilva131/skyland/apps/api/internal/ratelimit"
 	"github.com/davidsilva131/skyland/apps/api/internal/wallets"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,12 +26,12 @@ func New(cfg *config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handl
 
 	// Módulos del monolito modular (cada uno registra sus rutas y servicios).
 	wallets.Register(mux, pool)
-	// TODO(auth): sesiones httpOnly + RBAC (Admin / Soporte).
+	// auth: Postgres store + Upstash Redis limiter (fake si no hay URL).
+	auth.Register(mux, auth.NewPostgres(pool), newLimiter(cfg, logger), logger, cfg.CORSOrigins)
 	// TODO(games): motor de apuestas + contratos BetMarket/ResultSource.
 	// TODO(notifications): SSE contador de sorteo y resultados.
 	// TODO(admin): backoffice RBAC.
 
-	registerStatus(mux, "GET /api/v1/auth/status", "auth")
 	registerStatus(mux, "GET /api/v1/games", "games")
 	registerStatus(mux, "GET /api/v1/payments/status", "payments")
 	registerStatus(mux, "GET /api/v1/notifications/status", "notifications")
@@ -40,6 +42,16 @@ func New(cfg *config.Config, pool *pgxpool.Pool, logger *slog.Logger) http.Handl
 	return logRequests(logger)(cors(cfg.CORSOrigins)(mux))
 }
 
+// newLimiter: Upstash Redis si hay URL; fail-open (sin límite efectivo) si
+// no — en dev sin Redis la API sigue sirviendo (spec §4).
+func newLimiter(cfg *config.Config, logger *slog.Logger) ratelimit.Limiter {
+	if cfg.UpstashRedisURL == "" {
+		logger.Warn("ratelimit: SKYLAND_UPSTASH_REDIS_URL vacía — sin límite (fail-open)")
+		return ratelimit.NewFake()
+	}
+	return ratelimit.NewRedis(cfg.UpstashRedisURL, logger)
+}
+
 // RegisterFake arma los módulos sobre el fake in-memory (dev sin DB).
 // ponytail: no pasa por cors/logRequests; bórralo si el fake en runtime
 // deja de ser necesario (auth + Postgres local siempre disponible).
@@ -48,4 +60,5 @@ func RegisterFake(mux *http.ServeMux) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "backend": "fake"})
 	})
 	wallets.RegisterTest(mux)
+	auth.RegisterTest(mux)
 }

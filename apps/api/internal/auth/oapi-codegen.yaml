@@ -1,0 +1,7 @@
+package: auth
+generate:
+  std-http-server: true
+  models: true
+  embedded-spec: false
+  strict-server: false
+output: internal/auth/oapi_gen.go

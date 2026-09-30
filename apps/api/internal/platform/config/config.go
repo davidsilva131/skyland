@@ -12,7 +12,6 @@ type Config struct {
 	Environment     string
 	DatabaseURL     string
 	UpstashRedisURL string
-	JWTSecret       string
 	CORSOrigins     []string
 }
 
@@ -22,7 +21,6 @@ func Load() (*Config, error) {
 		Environment:     getenv("SKYLAND_ENVIRONMENT", "development"),
 		DatabaseURL:     os.Getenv("SKYLAND_DATABASE_URL"),
 		UpstashRedisURL: os.Getenv("SKYLAND_UPSTASH_REDIS_URL"),
-		JWTSecret:       os.Getenv("SKYLAND_JWT_SECRET"),
 	}
 
 	if cfg.DatabaseURL == "" {
