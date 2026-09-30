@@ -13,5 +13,8 @@
     "dev:web": "pnpm --filter apps-web run dev",
     "build:web": "pnpm --filter apps-web run build",
     "preview:web": "pnpm --filter apps-web run preview"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260929.1"
   }
 }

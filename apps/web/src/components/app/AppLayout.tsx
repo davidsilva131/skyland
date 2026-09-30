@@ -1,11 +1,68 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useSession } from './session';
 
 const nav = [
   { to: '/', label: 'Lobby', icon: '🎰' },
   { to: '/backoffice', label: 'Admin', icon: '🛠️' },
 ];
 
+/** Saldo desde la API de wallets (mismo origen, cookie de sesión). */
+function Saldo() {
+  // ponytail: un fetch sin caché ni revalidación; se mueve a un store
+  // compartido cuando la primera segunda vista necesite el saldo.
+  const [state, setState] = useState<
+    { kind: 'loading' } | { kind: 'error' } | { kind: 'ok'; monto: number; moneda: string }
+  >({ kind: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/wallets/saldo', { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`saldo ${res.status}`);
+        const body = (await res.json()) as { monto: number; moneda: string };
+        if (!cancelled) setState({ kind: 'ok', monto: body.monto, moneda: body.moneda });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ kind: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (state.kind === 'loading') {
+    return (
+      <span className="rounded-lg border border-white/10 px-3 py-1.5 text-sm font-semibold text-zinc-500">
+        Saldo: …
+      </span>
+    );
+  }
+  if (state.kind === 'error') {
+    return (
+      <span
+        className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-400"
+        title="No se pudo cargar el saldo. Intenta recargar la página."
+      >
+        Saldo: —
+      </span>
+    );
+  }
+  // El monto llega en la mínima unidad (céntimos) — se muestra en bolívares.
+  const formatted = new Intl.NumberFormat('es-VE', {
+    style: 'currency',
+    currency: 'VES',
+  }).format(state.monto / 100);
+  return (
+    <span className="rounded-lg border border-white/10 px-3 py-1.5 text-sm font-semibold text-zinc-300">
+      Saldo: <span className="text-amber-400">{formatted}</span>
+    </span>
+  );
+}
+
 export default function AppLayout() {
+  const { player, logout } = useSession();
+
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-100 pb-20 md:pb-0">
       {/* Header */}
@@ -16,9 +73,19 @@ export default function AppLayout() {
             Skyland
           </NavLink>
           <div className="flex items-center gap-3">
-            <span className="rounded-lg border border-white/10 px-3 py-1.5 text-sm font-semibold text-zinc-300">
-              Saldo: <span className="text-amber-400">Bs 0,00</span>
-            </span>
+            <Saldo />
+            {player && (
+              <div className="flex items-center gap-2">
+                <span className="hidden text-sm text-zinc-400 sm:inline">{player.email}</span>
+                <button
+                  type="button"
+                  onClick={() => void logout()}
+                  className="rounded-lg border border-white/10 px-3 py-1.5 text-sm font-semibold text-zinc-300 transition hover:border-amber-400/50 hover:text-white"
+                >
+                  Salir
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

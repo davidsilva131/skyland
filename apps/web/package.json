@@ -9,7 +9,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "gen:api": "openapi-typescript ../../apps/api/openapi.yaml -o src/lib/api/types.gen.ts",
+    "check": "astro check"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.4",
@@ -24,5 +26,10 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3"
   }
 }

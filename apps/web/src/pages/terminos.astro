@@ -1,0 +1,78 @@
+---
+import Layout from '../layouts/Base.astro';
+
+// Must match TERMS_VERSION in apps/api/internal/auth/validate.go — bump both
+// in the same commit (spec auth-player §4); re-acceptance then becomes
+// required.
+const TERMS_VERSION = '2026-09-01';
+---
+
+<Layout title="Términos y Condiciones — Skyland">
+  <main class="mx-auto max-w-2xl px-4 py-10">
+    <a href="/" class="text-2xl font-black tracking-tight text-amber-400">🎲 Skyland</a>
+
+    <h1 class="mt-8 text-3xl font-black tracking-tight">Términos y Condiciones</h1>
+    <p class="mt-2 text-sm text-zinc-400">Versión: <span class="font-mono text-amber-400">{TERMS_VERSION}</span></p>
+
+    <!-- TODO(final copy): the legal text below is the structure agreed in the
+         auth spec — David owns the final wording before the site is
+         announced. Sections are binding; the prose is a placeholder. -->
+    <div class="mt-8 space-y-8 text-sm leading-relaxed text-zinc-300 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white">
+      <section>
+        <h2>1. Mayores de 18 años</h2>
+        <p class="mt-2">
+          Solo pueden crear una cuenta y apostar las personas mayores de 18 años. Skyland puede
+          solicitar la cédula de identidad para verificar la edad de cualquier Jugador.
+        </p>
+      </section>
+
+      <section>
+        <h2>2. Juego responsable</h2>
+        <p class="mt-2">
+          Juega por diversión y con moderación. Apuesta solo lo que puedas permitirte perder. Si
+          sientes que el juego deja de ser un entretenimiento, establece límites o deja de jugar.
+        </p>
+      </section>
+
+      <section>
+        <h2>3. Sorteos propios (RNG)</h2>
+        <p class="mt-2">
+          Los resultados de los juegos (animalitos y demás) se generan con el generador de números
+          aleatorios propio de la plataforma. No dependemos de resultados de loterías externas.
+        </p>
+      </section>
+
+      <section>
+        <h2>4. Recargas por pago móvil</h2>
+        <p class="mt-2">
+          Los depósitos se realizan por pago móvil: transfieres el monto a la cuenta de la Casa y
+          reportas la referencia de 6 dígitos. Toda recarga pasa por verificación antes de
+          acreditarse en tu Saldo.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. Reglas de cuenta</h2>
+        <p class="mt-2">
+          Una persona, una cuenta. Está prohibido compartir credenciales, crear cuentas múltiples o
+          usar la plataforma con identidades falsas. Las cuentas que incumplan estas reglas pueden
+          ser suspendidas y sus saldos retenidos mientras se revisa el caso.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. Privacidad</h2>
+        <p class="mt-2">
+          Tratamos tus datos (correo, fecha de nacimiento, historial de juego) para operar la
+          plataforma y cumplir obligaciones legales. No vendemos tu información a terceros.
+        </p>
+      </section>
+    </div>
+
+    <p class="mt-10">
+      <a href="/login" class="text-xs text-zinc-500 underline underline-offset-2 hover:text-white">
+        ← Volver a entrar
+      </a>
+    </p>
+  </main>
+</Layout>
