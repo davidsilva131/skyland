@@ -42,7 +42,7 @@ func regBody(email, password, birthdate string, terms bool) string {
 // registerHappy: registro OK → 201 + cookie de sesión (devuelve la cookie).
 func registerHappy(t *testing.T, mux *http.ServeMux, email string) *http.Cookie {
 	t.Helper()
-	w := do(t, mux, mustReq(t, "POST", "/auth/register", regBody(email, "contrasenasagrada-1", "2000-01-15", true), nil))
+	w := do(t, mux, mustReq(t, "POST", "/api/v1/auth/register", regBody(email, "contrasenasagrada-1", "2000-01-15", true), nil))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("register %s: %d %s", email, w.Code, w.Body.String())
 	}
@@ -77,7 +77,7 @@ func TestContractHappy(t *testing.T) {
 	c := registerHappy(t, mux, "flujo@ejemplo.com")
 
 	// /me con la cookie → 200 Player (y re-envía la cookie rodante).
-	w := do(t, mux, withCookie(mustReq(t, "GET", "/auth/me", "", nil), c.Value))
+	w := do(t, mux, withCookie(mustReq(t, "GET", "/api/v1/auth/me", "", nil), c.Value))
 	if w.Code != http.StatusOK {
 		t.Fatalf("me: %d %s", w.Code, w.Body.String())
 	}
@@ -103,7 +103,7 @@ func TestContractHappy(t *testing.T) {
 	}
 
 	// logout → 204 + cookie Max-Age=0.
-	w = do(t, mux, withCookie(mustReq(t, "POST", "/auth/logout", "", nil), c.Value))
+	w = do(t, mux, withCookie(mustReq(t, "POST", "/api/v1/auth/logout", "", nil), c.Value))
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("logout: %d %s", w.Code, w.Body.String())
 	}
@@ -118,7 +118,7 @@ func TestContractHappy(t *testing.T) {
 	}
 
 	// /me tras logout → 401 unauthenticated.
-	w = do(t, mux, withCookie(mustReq(t, "GET", "/auth/me", "", nil), c.Value))
+	w = do(t, mux, withCookie(mustReq(t, "GET", "/api/v1/auth/me", "", nil), c.Value))
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("me tras logout: %d", w.Code)
 	}
@@ -151,7 +151,7 @@ func TestContractRegisterErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w := do(t, mux, mustReq(t, "POST", "/auth/register", tc.body, nil))
+			w := do(t, mux, mustReq(t, "POST", "/api/v1/auth/register", tc.body, nil))
 			if w.Code != tc.wantStatus {
 				t.Fatalf("status = %d; want %d (body %s)", w.Code, tc.wantStatus, w.Body.String())
 			}
@@ -160,7 +160,7 @@ func TestContractRegisterErrors(t *testing.T) {
 	}
 
 	// Malformed JSON → 400 problem+json validation [spec-added].
-	w := do(t, mux, mustReq(t, "POST", "/auth/register", "{email roto", nil))
+	w := do(t, mux, mustReq(t, "POST", "/api/v1/auth/register", "{email roto", nil))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("malformed json: %d", w.Code)
 	}
@@ -173,7 +173,7 @@ func TestContractLogin(t *testing.T) {
 	mux := newMux(t)
 	registerHappy(t, mux, "login@ejemplo.com")
 
-	w := do(t, mux, mustReq(t, "POST", "/auth/login", `{"email":"LOGIN@ejemplo.com","password":"contrasenasagrada-1"}`, nil))
+	w := do(t, mux, mustReq(t, "POST", "/api/v1/auth/login", `{"email":"LOGIN@ejemplo.com","password":"contrasenasagrada-1"}`, nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("login feliz: %d %s", w.Code, w.Body.String())
 	}
@@ -182,10 +182,10 @@ func TestContractLogin(t *testing.T) {
 	}
 
 	// Contraseña mala.
-	w = do(t, mux, mustReq(t, "POST", "/auth/login", `{"email":"login@ejemplo.com","password":"otraclave-larga-99"}`, nil))
+	w = do(t, mux, mustReq(t, "POST", "/api/v1/auth/login", `{"email":"login@ejemplo.com","password":"otraclave-larga-99"}`, nil))
 	assertProblem(t, w, http.StatusUnauthorized, InvalidCredentials)
 	// Email desconocido — la MISMA respuesta.
-	w2 := do(t, mux, mustReq(t, "POST", "/auth/login", `{"email":"nadie@ejemplo.com","password":"contrasenasagrada-1"}`, nil))
+	w2 := do(t, mux, mustReq(t, "POST", "/api/v1/auth/login", `{"email":"nadie@ejemplo.com","password":"contrasenasagrada-1"}`, nil))
 	if w2.Body.String() != w.Body.String() || w2.Code != w.Code {
 		t.Fatalf("respuesta de email desconocido distinta de la de password mala (anti-enumeración)")
 	}
@@ -222,11 +222,11 @@ func TestContractOrigin(t *testing.T) {
 	// El fake RegisterTest no pasa orígenes: vacío → cualquier Origin se
 	// rechaza. Para el caso feliz, un mux con la lista cargada a mano.
 	bad := "https://malo.ejemplo.com"
-	w := do(t, newMux(t), mustReq(t, "POST", "/auth/register", regBody("origen@ejemplo.com", "contrasenasagrada-1", "2000-01-15", true), &bad))
+	w := do(t, newMux(t), mustReq(t, "POST", "/api/v1/auth/register", regBody("origen@ejemplo.com", "contrasenasagrada-1", "2000-01-15", true), &bad))
 	assertProblem(t, w, http.StatusForbidden, OriginRejected)
 
 	// Origin ausente: pasa el check (llega al flujo normal).
-	w = do(t, newMux(t), mustReq(t, "POST", "/auth/register", regBody("sinorigen@ejemplo.com", "contrasenasagrada-1", "2000-01-15", true), nil))
+	w = do(t, newMux(t), mustReq(t, "POST", "/api/v1/auth/register", regBody("sinorigen@ejemplo.com", "contrasenasagrada-1", "2000-01-15", true), nil))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("sin Origin: %d %s", w.Code, w.Body.String())
 	}
@@ -238,7 +238,7 @@ func TestContractRateLimited(t *testing.T) {
 	mux := newMux(t)
 	var last *httptest.ResponseRecorder
 	for i := 0; i < 21; i++ { // LoginIPLimit = 20 → la 21ª bloquea
-		last = do(t, mux, mustReq(t, "POST", "/auth/register",
+		last = do(t, mux, mustReq(t, "POST", "/api/v1/auth/register",
 			regBody(fmt.Sprintf("burst%d@ejemplo.com", i), "contrasenasagrada-1", "2000-01-15", true), nil))
 	}
 	if last.Code != http.StatusTooManyRequests {
@@ -255,7 +255,7 @@ func TestContractLogoutIdempotent(t *testing.T) {
 	mux := newMux(t)
 	c := registerHappy(t, mux, "out@ejemplo.com")
 	for i := 0; i < 2; i++ {
-		w := do(t, mux, withCookie(mustReq(t, "POST", "/auth/logout", "", nil), c.Value))
+		w := do(t, mux, withCookie(mustReq(t, "POST", "/api/v1/auth/logout", "", nil), c.Value))
 		if w.Code != http.StatusNoContent {
 			t.Fatalf("logout #%d: %d", i+1, w.Code)
 		}
@@ -267,17 +267,17 @@ func TestContractMe401(t *testing.T) {
 	mux := newMux(t)
 
 	// Sin cookie.
-	w := do(t, mux, mustReq(t, "GET", "/auth/me", "", nil))
+	w := do(t, mux, mustReq(t, "GET", "/api/v1/auth/me", "", nil))
 	assertProblem(t, w, http.StatusUnauthorized, Unauthenticated)
 
 	// Cookie inventada.
-	w = do(t, mux, withCookie(mustReq(t, "GET", "/auth/me", "", nil), "no-existe"))
+	w = do(t, mux, withCookie(mustReq(t, "GET", "/api/v1/auth/me", "", nil), "no-existe"))
 	assertProblem(t, w, http.StatusUnauthorized, Unauthenticated)
 
 	// Revocada (logout antes).
 	c := registerHappy(t, mux, "rev@ejemplo.com")
-	do(t, mux, withCookie(mustReq(t, "POST", "/auth/logout", "", nil), c.Value))
-	w = do(t, mux, withCookie(mustReq(t, "GET", "/auth/me", "", nil), c.Value))
+	do(t, mux, withCookie(mustReq(t, "POST", "/api/v1/auth/logout", "", nil), c.Value))
+	w = do(t, mux, withCookie(mustReq(t, "GET", "/api/v1/auth/me", "", nil), c.Value))
 	assertProblem(t, w, http.StatusUnauthorized, Unauthenticated)
 }
 

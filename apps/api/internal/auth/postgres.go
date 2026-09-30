@@ -80,7 +80,7 @@ func (s postgresStore) Login(ctx context.Context, email, password string, now ti
 	var (
 		id        openapi_types.UUID
 		hash      string
-		birthdate string
+		birthdate time.Time
 	)
 	err := s.pool.QueryRow(ctx,
 		`SELECT id, password_hash, birthdate FROM players WHERE email = $1`, e).
@@ -129,7 +129,7 @@ func (s postgresStore) Verify(ctx context.Context, token string) (Player, error)
 	var (
 		id          openapi_types.UUID
 		email       string
-		birthdate   string
+		birthdate   time.Time
 		createdAt   time.Time
 		expires     time.Time
 		absoluteExp time.Time
@@ -174,9 +174,16 @@ func insertSession(ctx context.Context, tx pgx.Tx, playerID openapi_types.UUID, 
 	return err
 }
 
-// newPlayer arma el schema Player generado desde la fila.
-func newPlayer(id openapi_types.UUID, email, birthdate string, createdAt time.Time) Player {
-	b, _ := time.ParseInLocation("2006-01-02", birthdate, caracasTZ)
+// newPlayer arma el schema Player generado desde la fila. birthdate puede
+// llegar como string (INSERT path) o time.Time (SELECT del date column).
+func newPlayer(id openapi_types.UUID, email string, birthdate any, createdAt time.Time) Player {
+	var b time.Time
+	switch bd := birthdate.(type) {
+	case time.Time:
+		b = bd
+	case string:
+		b, _ = time.ParseInLocation("2006-01-02", bd, caracasTZ)
+	}
 	return Player{
 		Id:        id,
 		Email:     email,

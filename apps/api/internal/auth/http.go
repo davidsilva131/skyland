@@ -28,15 +28,17 @@ type handler struct {
 
 // RegisterRoutes registra las rutas del módulo (spec §4: espejo wallets —
 // Register sobre el mux compartido; los helpers HTTP son module-local).
+// BaseURL "/api/v1": el contrato (openapi.yaml servers: /) se sirve bajo el
+// prefijo del monolito — parity con wallets (`/api/v1/wallets/...`).
 func RegisterRoutes(mux *http.ServeMux, svc Service, limiter ratelimit.Limiter, logger *slog.Logger, origins []string) {
 	allowed := map[string]bool{}
 	for _, o := range origins {
 		allowed[o] = true
 	}
-	// Deleter: el limiter de Redis lo trae (reset del email en login OK);
-	// el fake lo satisface vía el cast de abajo (no-op en in-memory).
+	// Deleter: el limiter de Redis lo trae (reset del contador de email en
+	// login OK); el fake lo satisface vía el cast de abajo (no-op in-memory).
 	h := &handler{svc: svc, limiter: limiter, delim: deleter(limiter), logger: logger, allowed: allowed, now: time.Now}
-	HandlerFromMux(h, mux)
+	HandlerFromMuxWithBaseURL(h, mux, "/api/v1")
 }
 
 // deleter: el Deleter del limiter si lo trae; no-op si no (fake).
