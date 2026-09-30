@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/davidsilva131/skyland/apps/api/internal/ratelimit"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // handler implementa el ServerInterface generado (oapi_gen.go): solo HTTP —
@@ -133,6 +134,17 @@ func decodeJSON(r *http.Request, v any) error {
 	return nil
 }
 
+// birthdateString convierte la fecha generada a "YYYY-MM-DD" y rechaza el
+// valor cero: oapi-codegen no aplica `required` a campos del body JSON, así
+// que una petición sin birthdate llega como Date{} → "0001-01-01", burlando
+// el corte de +18 (code review #9/#11). "" → 422 validation.
+func birthdateString(d openapi_types.Date) string {
+	if d.Time.IsZero() {
+		return ""
+	}
+	return d.Time.Format("2006-01-02")
+}
+
 // tooMany: 429 problem+json rate_limited + Retry-After (segundos, cap 60).
 func (h *handler) tooMany(w http.ResponseWriter) {
 	w.Header().Set("Retry-After", "60")
@@ -172,7 +184,7 @@ func (h *handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := h.svc.Register(r.Context(), string(req.Email), req.Password,
-		req.Birthdate.Time.Format("2006-01-02"), bool(req.AcceptsTerms), h.now(), clientIP(r))
+		birthdateString(req.Birthdate), bool(req.AcceptsTerms), h.now(), clientIP(r))
 	if err != nil {
 		if code, detail, ok := validationCode(err); ok {
 			writeProblem(w, http.StatusUnprocessableEntity, code, detail)
@@ -211,11 +223,18 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := h.svc.Login(r.Context(), email, req.Password, h.now())
 	if err != nil {
+		// Solo las credenciales malas son 401; cualquier otro error (DB
+		// caída, etc.) es 500 — nunca enmascarado como contraseña mala.
 		if errors.Is(err, ErrInvalidCredentials) {
-			h.logger.Info("auth: credenciales inválidas", "email", email, "ip", clientIP(r))
+			// sin PII: el email no entra al log (code review #9/#11).
+			h.logger.Info("auth: credenciales inválidas", "ip", clientIP(r))
+			writeProblem(w, http.StatusUnauthorized, InvalidCredentials,
+				"Correo o contraseña incorrectos.")
+			return
 		}
-		writeProblem(w, http.StatusUnauthorized, InvalidCredentials,
-			"Correo o contraseña incorrectos.")
+		h.logger.Error("auth: login", "err", err)
+		writeProblem(w, http.StatusInternalServerError, Validation,
+			"Error del servidor. Intenta más tarde.")
 		return
 	}
 	if err := h.delim.Del(r.Context(), ratelimit.EmailKey(email)); err != nil {
